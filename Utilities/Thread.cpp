@@ -10,6 +10,8 @@
 #include "Thread.h"
 #include "Utilities/JIT.h"
 #include <cfenv>
+#include <algorithm>
+#include <cstdlib>
 
 #ifdef ARCH_ARM64
 #include "Emu/CPU/Backends/AArch64/AArch64Signal.h"
@@ -3826,6 +3828,76 @@ u64 thread_ctrl::get_affinity_mask(thread_class group)
 	}
 
 	return -1;
+}
+
+// Returns true if the environment variable is set to something other than "0" (used for optional benchmark logging)
+bool rpcs3_env_flag(const char* name)
+{
+#ifdef _WIN32
+	char buf[8]{};
+	const DWORD len = GetEnvironmentVariableA(name, buf, sizeof(buf));
+	return len > 0 && len < sizeof(buf) && buf[0] != '0';
+#else
+	const char* value = std::getenv(name);
+	return value && *value && *value != '0';
+#endif
+}
+
+// Personal tuning knobs, read from environment variables (set them from a launcher .bat).
+// If a variable is not set, nothing changes.
+//   RPCS3_PRIO_PPU / RPCS3_PRIO_SPU / RPCS3_PRIO_RSX : thread priority offset, from -2 to 2
+//   RPCS3_AFF_PPU  / RPCS3_AFF_SPU  / RPCS3_AFF_RSX  : thread affinity mask in hexadecimal (e.g. 8 = core 3)
+void rpcs3_apply_thread_tuning(thread_class group)
+{
+#ifdef _WIN32
+	const char* prio_var = nullptr;
+	const char* aff_var = nullptr;
+
+	switch (group)
+	{
+	case thread_class::ppu:
+		prio_var = "RPCS3_PRIO_PPU";
+		aff_var = "RPCS3_AFF_PPU";
+		break;
+	case thread_class::spu:
+		prio_var = "RPCS3_PRIO_SPU";
+		aff_var = "RPCS3_AFF_SPU";
+		break;
+	case thread_class::rsx:
+		prio_var = "RPCS3_PRIO_RSX";
+		aff_var = "RPCS3_AFF_RSX";
+		break;
+	default:
+		return;
+	}
+
+	char buf[32]{};
+
+	if (const DWORD len = GetEnvironmentVariableA(prio_var, buf, sizeof(buf)); len > 0 && len < sizeof(buf))
+	{
+		const int level = std::clamp(std::atoi(buf), -2, 2);
+
+		if (!SetThreadPriority(GetCurrentThread(), level))
+		{
+			sig_log.error("SetThreadPriority(%d) failed: %s", level, fmt::win_error{GetLastError(), nullptr});
+		}
+		else
+		{
+			sig_log.success("Thread tuning: %s priority set to %d", prio_var, level);
+		}
+	}
+
+	if (const DWORD len = GetEnvironmentVariableA(aff_var, buf, sizeof(buf)); len > 0 && len < sizeof(buf))
+	{
+		if (const u64 mask = std::strtoull(buf, nullptr, 16))
+		{
+			thread_ctrl::set_thread_affinity_mask(mask);
+			sig_log.success("Thread tuning: %s affinity mask set to 0x%x", aff_var, mask);
+		}
+	}
+#else
+	static_cast<void>(group);
+#endif
 }
 
 void thread_ctrl::set_native_priority(int priority)
