@@ -649,6 +649,9 @@ namespace cpu_counter
 	}
 }
 
+// Defined in Utilities/Thread.cpp
+void rpcs3_apply_thread_tuning(thread_class group);
+
 void cpu_thread::operator()()
 {
 	const auto old_prefix = g_tls_log_prefix;
@@ -659,6 +662,8 @@ void cpu_thread::operator()()
 	{
 		thread_ctrl::set_thread_affinity_mask(thread_ctrl::get_affinity_mask(get_class()));
 	}
+
+	rpcs3_apply_thread_tuning(get_class());
 
 	ensure(g_fxo->is_init<cpu_profiler>());
 
