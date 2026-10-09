@@ -139,8 +139,8 @@ jobs:
         id: restore-build-ccache
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: "${{ runner.os }}-ccache-${{ env.COMPILER }}-${{github.run_id}}"
-          restore-keys: ${{ runner.os }}-ccache-${{ env.COMPILER }}-
+          key: "${{ runner.os }}-ccache-${{ env.COMPILER }}-avx2-${{github.run_id}}"
+          restore-keys: ${{ runner.os }}-ccache-${{ env.COMPILER }}-avx2-
 
       - name: Restore Dependencies Cache
         uses: actions/cache/restore@main
@@ -168,6 +168,8 @@ jobs:
 
       - name: Compile RPCS3
         shell: pwsh
+        env:
+          CL: /arch:AVX2 /GS-
         run: msbuild rpcs3.sln /p:Configuration=Release /v:minimal /p:Platform=x64 /p:PreferredToolArchitecture=x64 /p:CLToolPath=${{ env.CCACHE_BIN_DIR }} /p:UseMultiToolTask=true /p:CustomAfterMicrosoftCommonTargets="${{ github.workspace }}\buildfiles\msvc\ci_only.targets"
 
       - name: Pack up build artifacts
