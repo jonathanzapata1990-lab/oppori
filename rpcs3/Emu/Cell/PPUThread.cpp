@@ -44,6 +44,9 @@
 #include <llvm/Analysis/LoopAnalysisManager.h>
 #include <llvm/Passes/PassBuilder.h>
 #include <llvm/Transforms/Scalar/EarlyCSE.h>
+#include <llvm/Transforms/InstCombine/InstCombine.h>
+#include <llvm/Transforms/Scalar/SimplifyCFG.h>
+#include <llvm/Transforms/Scalar/DeadStoreElimination.h>
 #ifdef _MSC_VER
 #pragma warning(pop)
 #else
@@ -5587,7 +5590,7 @@ bool ppu_initialize(const ppu_module<lv2_obj>& info, bool check_only, u64 file_s
 				settings += ppu_settings::daz_and_ftz;
 
 			// Write version, hash, CPU, settings
-			fmt::append(obj_name, "v8-kusa-%s-%s-%s.obj", fmt::base57(output, 16), fmt::base57(settings), jit_compiler::cpu(g_cfg.core.llvm_cpu.to_string()));
+			fmt::append(obj_name, "v9-kusa-%s-%s-%s.obj", fmt::base57(output, 16), fmt::base57(settings), jit_compiler::cpu(g_cfg.core.llvm_cpu.to_string()));
 		}
 
 		if (cpu ? cpu->state.all_of(cpu_flag::exit) : Emu.IsStopped())
@@ -6052,7 +6055,13 @@ static void ppu_initialize2(jit_compiler& jit, const ppu_module<lv2_obj>& module
 
 		FunctionPassManager fpm;
 		// Basic optimizations
-		fpm.addPass(EarlyCSEPass());
+		// [perf-hack] Heavier pipeline: MemorySSA-based CSE (forwards guest register loads/stores),
+		// InstCombine, SimplifyCFG and DSE. Slower precompile, faster guest code.
+		// If a game misbehaves, remove DSEPass() first.
+		fpm.addPass(EarlyCSEPass(true));
+		fpm.addPass(InstCombinePass());
+		fpm.addPass(SimplifyCFGPass());
+		fpm.addPass(DSEPass());
 
 		u32 guest_code_size = 0;
 		u32 min_addr = umax;

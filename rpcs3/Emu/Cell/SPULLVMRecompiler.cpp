@@ -51,6 +51,8 @@ const extern spu_decoder<spu_iflag> g_spu_iflag;
 #include <llvm/Transforms/Scalar/ADCE.h>
 #include <llvm/Transforms/Scalar/DeadStoreElimination.h>
 #include <llvm/Transforms/Scalar/EarlyCSE.h>
+#include <llvm/Transforms/InstCombine/InstCombine.h>
+#include <llvm/Transforms/Scalar/GVN.h>
 #include <llvm/Transforms/Scalar/LICM.h>
 #include <llvm/Transforms/Scalar/LoopPassManager.h>
 #include <llvm/Transforms/Scalar/SimplifyCFG.h>
@@ -3859,9 +3861,13 @@ public:
 		FunctionPassManager fpm;
 		// Basic optimizations
 		fpm.addPass(EarlyCSEPass(true));
+		// [perf-hack] Extra passes: better SPU code at the cost of longer compile time
+		fpm.addPass(InstCombinePass());
 		fpm.addPass(SimplifyCFGPass());
+		fpm.addPass(GVNPass());
 		fpm.addPass(DSEPass());
 		fpm.addPass(createFunctionToLoopPassAdaptor(LICMPass(LICMOptions()), true));
+		fpm.addPass(InstCombinePass());
 		fpm.addPass(ADCEPass());
 
 		for (auto& f : *m_module)
