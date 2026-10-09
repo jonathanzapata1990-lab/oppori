@@ -12,6 +12,12 @@
 
 #include "util/cpu_stats.hpp"
 
+// Defined in Utilities/Thread.cpp
+bool rpcs3_env_flag(const char* name);
+
+// Optional benchmark log: one line per overlay update in RPCS3.log (enabled with RPCS3_PERF_LOG=1)
+LOG_CHANNEL(rpcs3_bench_log, "BENCH");
+
 namespace rsx
 {
 	namespace overlays
@@ -623,6 +629,13 @@ namespace rsx
 					    m_fps, m_frametime, std::string(title1_high.size(), ' '), m_ppu_usage, m_ppus, m_spu_usage, m_spus, m_rsx_usage, m_cpu_usage, m_total_threads, std::string(title2.size(), ' '), m_rsx_load);
 					break;
 				}
+				}
+
+				static const bool s_bench_log = rpcs3_env_flag("RPCS3_PERF_LOG");
+
+				if (s_bench_log && !m_force_update && m_frames > 0)
+				{
+					rpcs3_bench_log.success("fps=%.2f frametime=%.2f cpu=%.1f ppu=%.1f spu=%.1f rsx=%.1f rsx_load=%u", m_fps, m_frametime, m_cpu_usage, m_ppu_usage, m_spu_usage, m_rsx_usage, m_rsx_load);
 				}
 
 				m_body.set_text(perf_text);
