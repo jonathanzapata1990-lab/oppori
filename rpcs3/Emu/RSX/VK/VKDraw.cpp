@@ -9,6 +9,16 @@
 #include "vkutils/chip_class.h"
 #include <vulkan/vulkan_core.h>
 
+#include <algorithm>
+#include <functional>
+#include <map>
+#include <utility>
+#include <vector>
+
+// Defined in Utilities/Thread.cpp
+bool rpcs3_env_flag(const char* name);
+u32 rpcs3_env_u32(const char* name, u32 def);
+
 namespace vk
 {
 	VkImageViewType get_view_type(rsx::texture_dimension_extended type)
@@ -1267,6 +1277,55 @@ void VKGSRender::end()
 		execute_nop_draw();
 		rsx::thread::end();
 		return;
+	}
+
+	// Optional diagnostics / experiments, controlled by environment variables:
+	//   RPCS3_PERF_LOG=1        : log what kind of render pass the draw calls belong to
+	//   RPCS3_SKIP_DEPTH_ONLY=N : skip depth-only draws (shadow maps / depth pre-pass) with surface width >= N (1 = all)
+	static const bool s_bench_log = rpcs3_env_flag("RPCS3_PERF_LOG");
+	static const u32 s_skip_depth_min_width = rpcs3_env_u32("RPCS3_SKIP_DEPTH_ONLY", 0);
+
+	if (s_bench_log || s_skip_depth_min_width)
+	{
+		const bool depth_only = rsx::method_registers.surface_color_target() == rsx::surface_target::none;
+		const u32 clip_w = rsx::method_registers.surface_clip_width();
+		const u32 clip_h = rsx::method_registers.surface_clip_height();
+
+		if (s_skip_depth_min_width && depth_only && clip_w >= s_skip_depth_min_width)
+		{
+			execute_nop_draw();
+			rsx::thread::end();
+			return;
+		}
+
+		if (s_bench_log)
+		{
+			static std::map<u64, u32> s_draw_buckets;
+			static u32 s_draw_counter = 0;
+
+			s_draw_buckets[(u64{depth_only ? 1u : 0u} << 32) | (u64{clip_w} << 16) | clip_h]++;
+
+			if (++s_draw_counter >= 100000)
+			{
+				std::vector<std::pair<u32, u64>> sorted;
+
+				for (const auto& [key, count] : s_draw_buckets)
+				{
+					sorted.emplace_back(count, key);
+				}
+
+				std::sort(sorted.begin(), sorted.end(), std::greater<>());
+
+				for (usz i = 0; i < sorted.size() && i < 5; i++)
+				{
+					const u64 key = sorted[i].second;
+					rsx_log.success("BENCH draws: %s %ux%u = %u of %u", (key >> 32) ? "depth-only" : "color", static_cast<u32>((key >> 16) & 0xffff), static_cast<u32>(key & 0xffff), sorted[i].first, s_draw_counter);
+				}
+
+				s_draw_buckets.clear();
+				s_draw_counter = 0;
+			}
+		}
 	}
 
 	m_profiler.start();
