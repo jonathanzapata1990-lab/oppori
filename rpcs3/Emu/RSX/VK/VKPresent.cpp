@@ -15,6 +15,8 @@
 extern atomic_t<bool> g_user_asked_for_screenshot;
 extern atomic_t<recording_mode> g_recording_mode;
 
+// Defined in Utilities/Thread.cpp
+bool rpcs3_env_flag(const char* name);
 namespace
 {
 	VkFormat RSX_display_format_to_vk_format(u8 format)
@@ -935,6 +937,15 @@ void VKGSRender::flip(const rsx::display_flip_info_t& info)
 			const auto program_cache_ellision_rate = program_cache_lookups
 				? (program_cache_ellided * 100) / program_cache_lookups
 				: 0;
+
+			// Optional benchmark log (RPCS3_PERF_LOG=1): RSX stage timings, once every 30 frames
+			static const bool s_bench_log = rpcs3_env_flag("RPCS3_PERF_LOG");
+			static u32 s_bench_counter = 0;
+
+			if (s_bench_log && (++s_bench_counter % 30) == 0)
+			{
+				rsx_log.success("BENCH rsx: draw_calls=%u setup=%uus vertex_upload=%uus texture_upload=%uus draw_exec=%uus flip=%uus load=%u", info.stats.draw_calls, info.stats.setup_time, info.stats.vertex_upload_time, info.stats.textures_upload_time, info.stats.draw_exec_time, info.stats.flip_time, get_load());
+			}
 
 			rsx::overlays::set_debug_overlay_text(fmt::format(
 				"Internal Resolution:      %s\n"
