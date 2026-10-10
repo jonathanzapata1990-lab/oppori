@@ -3843,6 +3843,19 @@ bool rpcs3_env_flag(const char* name)
 #endif
 }
 
+// Returns the numeric value of an environment variable, or 'def' if it is not set
+u32 rpcs3_env_u32(const char* name, u32 def)
+{
+#ifdef _WIN32
+	char buf[16]{};
+	const DWORD len = GetEnvironmentVariableA(name, buf, sizeof(buf));
+	return (len > 0 && len < sizeof(buf)) ? static_cast<u32>(std::strtoul(buf, nullptr, 10)) : def;
+#else
+	const char* value = std::getenv(name);
+	return (value && *value) ? static_cast<u32>(std::strtoul(value, nullptr, 10)) : def;
+#endif
+}
+
 // Personal tuning knobs, read from environment variables (set them from a launcher .bat).
 // If a variable is not set, nothing changes.
 //   RPCS3_PRIO_PPU / RPCS3_PRIO_SPU / RPCS3_PRIO_RSX : thread priority offset, from -2 to 2
