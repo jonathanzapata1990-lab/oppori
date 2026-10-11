@@ -1316,7 +1316,7 @@ extern void ppu_execute_syscall(ppu_thread& ppu, u64 code)
 
 	if (code < g_ppu_syscall_table.size())
 	{
-		g_fxo->get<named_thread<ppu_syscall_usage>>().stat[code]++;
+		// Syscall usage counting removed (an atomic increment on every syscall); the periodic usage stats log will stay empty
 
 		if (const auto func = g_ppu_syscall_table[code].first)
 		{

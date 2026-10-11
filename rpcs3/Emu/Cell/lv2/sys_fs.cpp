@@ -1453,7 +1453,7 @@ error_code sys_fs_open(ppu_thread& ppu, vm::cptr<char> path, s32 flags, vm::ptr<
 {
 	lv2_obj::sleep(ppu);
 
-	sys_fs.warning("sys_fs_open(path=%s, flags=%#o, fd=*0x%x, mode=%#o, arg=*0x%x, size=0x%llx)", path, flags, fd, mode, arg, size);
+	sys_fs.trace("sys_fs_open(path=%s, flags=%#o, fd=*0x%x, mode=%#o, arg=*0x%x, size=0x%llx)", path, flags, fd, mode, arg, size);
 
 	const auto [path_error, vpath] = translate_to_str(path);
 
@@ -1484,7 +1484,7 @@ error_code sys_fs_open(ppu_thread& ppu, vm::cptr<char> path, s32 flags, vm::ptr<
 		}
 
 		result = stx::make_shared<lv2_file>(ppath, std::move(file), mode, flags, real, type);
-		sys_fs.warning("sys_fs_open(): fd=%u, %s", idm::last_id(), *result);
+		sys_fs.trace("sys_fs_open(): fd=%u, %s", idm::last_id(), *result);
 		return result;
 	}))
 	{
@@ -1742,7 +1742,7 @@ error_code sys_fs_opendir(ppu_thread& ppu, vm::cptr<char> path, vm::ptr<u32> fd)
 {
 	lv2_obj::sleep(ppu);
 
-	sys_fs.warning("sys_fs_opendir(path=%s, fd=*0x%x)", path, fd);
+	sys_fs.trace("sys_fs_opendir(path=%s, fd=*0x%x)", path, fd);
 
 	const auto [path_error, vpath] = translate_to_str(path);
 
@@ -1914,7 +1914,7 @@ error_code sys_fs_readdir(ppu_thread& ppu, u32 fd, vm::ptr<CellFsDirent> dir, vm
 {
 	lv2_obj::sleep(ppu);
 
-	sys_fs.warning("sys_fs_readdir(fd=%d, dir=*0x%x, nread=*0x%x)", fd, dir, nread);
+	sys_fs.trace("sys_fs_readdir(fd=%d, dir=*0x%x, nread=*0x%x)", fd, dir, nread);
 
 	if (!dir || !nread)
 	{
@@ -1973,7 +1973,7 @@ error_code sys_fs_closedir(ppu_thread& ppu, u32 fd)
 {
 	lv2_obj::sleep(ppu);
 
-	sys_fs.warning("sys_fs_closedir(fd=%d)", fd);
+	sys_fs.trace("sys_fs_closedir(fd=%d)", fd);
 
 	if (!idm::remove<lv2_fs_object, lv2_dir>(fd))
 	{
@@ -1987,7 +1987,7 @@ error_code sys_fs_stat(ppu_thread& ppu, vm::cptr<char> path, vm::ptr<CellFsStat>
 {
 	lv2_obj::sleep(ppu);
 
-	sys_fs.warning("sys_fs_stat(path=%s, sb=*0x%x)", path, sb);
+	sys_fs.trace("sys_fs_stat(path=%s, sb=*0x%x)", path, sb);
 
 	const auto [path_error, vpath] = translate_to_str(path);
 
@@ -2114,7 +2114,7 @@ error_code sys_fs_fstat(ppu_thread& ppu, u32 fd, vm::ptr<CellFsStat> sb)
 {
 	lv2_obj::sleep(ppu);
 
-	sys_fs.warning("sys_fs_fstat(fd=%d, sb=*0x%x)", fd, sb);
+	sys_fs.trace("sys_fs_fstat(fd=%d, sb=*0x%x)", fd, sb);
 
 	const auto file = idm::get_unlocked<lv2_fs_object, lv2_file>(fd);
 
@@ -3249,7 +3249,7 @@ error_code sys_fs_get_block_size(ppu_thread& ppu, vm::cptr<char> path, vm::ptr<u
 {
 	lv2_obj::sleep(ppu);
 
-	sys_fs.warning("sys_fs_get_block_size(path=%s, sector_size=*0x%x, block_size=*0x%x, arg4=*0x%x)", path, sector_size, block_size, arg4);
+	sys_fs.trace("sys_fs_get_block_size(path=%s, sector_size=*0x%x, block_size=*0x%x, arg4=*0x%x)", path, sector_size, block_size, arg4);
 
 	const auto [path_error, vpath] = translate_to_str(path);
 
