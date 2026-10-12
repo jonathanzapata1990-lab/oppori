@@ -447,6 +447,10 @@ error_code sys_timer_sleep(ppu_thread& ppu, u32 sleep_time)
 	return sys_timer_usleep(ppu, sleep_time * u64{1000000});
 }
 
+// Defined in Utilities/Thread.cpp
+bool rpcs3_env_flag(const char* name);
+u32 rpcs3_env_u32(const char* name, u32 def);
+
 error_code sys_timer_usleep(ppu_thread& ppu, u64 sleep_time)
 {
 	ppu.state += cpu_flag::wait;
@@ -476,7 +480,30 @@ error_code sys_timer_usleep(ppu_thread& ppu, u64 sleep_time)
 	}
 	else
 	{
-		std::this_thread::yield();
+		// usleep(0) is used by games as a spin-wait. Optional experiments (environment variables):
+		//   RPCS3_USLEEP0_US=N : wait N us instead of yielding (coarse: the timer resolution is ~500 us)
+		//   RPCS3_PERF_LOG=1   : log how many times each thread calls it
+		static const u32 s_usleep0_us = rpcs3_env_u32("RPCS3_USLEEP0_US", 0);
+		static const bool s_bench_log = rpcs3_env_flag("RPCS3_PERF_LOG");
+
+		if (s_bench_log)
+		{
+			thread_local u64 s_calls = 0;
+
+			if (++s_calls % 2000000 == 0)
+			{
+				sys_timer.success("BENCH usleep(0): %u calls from this thread", s_calls);
+			}
+		}
+
+		if (s_usleep0_us)
+		{
+			thread_ctrl::wait_for(s_usleep0_us);
+		}
+		else
+		{
+			std::this_thread::yield();
+		}
 	}
 
 	return CELL_OK;

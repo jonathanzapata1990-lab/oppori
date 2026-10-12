@@ -162,6 +162,10 @@ void _sys_ppu_thread_exit(ppu_thread& ppu, u64 errorcode)
 	}
 }
 
+// Defined in Utilities/Thread.cpp
+bool rpcs3_env_flag(const char* name);
+u32 rpcs3_env_u32(const char* name, u32 def);
+
 s32 sys_ppu_thread_yield(ppu_thread& ppu)
 {
 	ppu.state += cpu_flag::wait;
@@ -174,6 +178,27 @@ s32 sys_ppu_thread_yield(ppu_thread& ppu)
 	{
 		// Do other work in the meantime
 		lv2_obj::notify_all();
+
+		// Games spin on yield when no other thread is ready. Optional experiments (environment variables):
+		//   RPCS3_YIELD_US=N : wait N us after a yield that had nothing to switch to (coarse: the timer resolution is ~500 us)
+		//   RPCS3_PERF_LOG=1 : log how many times each thread does this
+		static const u32 s_yield_us = rpcs3_env_u32("RPCS3_YIELD_US", 0);
+		static const bool s_bench_log = rpcs3_env_flag("RPCS3_PERF_LOG");
+
+		if (s_bench_log)
+		{
+			thread_local u64 s_calls = 0;
+
+			if (++s_calls % 2000000 == 0)
+			{
+				sys_ppu_thread.success("BENCH yield(nothing to switch to): %u calls from this thread", s_calls);
+			}
+		}
+
+		if (s_yield_us)
+		{
+			thread_ctrl::wait_for(s_yield_us);
+		}
 	}
 
 	// Return 0 on successful context switch, 1 otherwise
