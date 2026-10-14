@@ -3843,6 +3843,19 @@ bool rpcs3_env_flag(const char* name)
 #endif
 }
 
+// Returns the value of an environment variable as a string (empty if it is not set)
+std::string rpcs3_env_str(const char* name)
+{
+#ifdef _WIN32
+	char buf[1024]{};
+	const DWORD len = GetEnvironmentVariableA(name, buf, sizeof(buf));
+	return (len > 0 && len < sizeof(buf)) ? std::string(buf, len) : std::string();
+#else
+	const char* value = std::getenv(name);
+	return value ? std::string(value) : std::string();
+#endif
+}
+
 // Returns the numeric value of an environment variable, or 'def' if it is not set
 u32 rpcs3_env_u32(const char* name, u32 def)
 {
