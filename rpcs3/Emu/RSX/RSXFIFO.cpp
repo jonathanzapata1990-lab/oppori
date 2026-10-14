@@ -18,6 +18,10 @@ using spu_rdata_t = std::byte[128];
 extern void mov_rdata(spu_rdata_t& _dst, const spu_rdata_t& _src);
 extern bool cmp_rdata(const spu_rdata_t& _lhs, const spu_rdata_t& _rhs);
 
+// Defined in Utilities/Thread.cpp
+bool rpcs3_env_flag(const char* name);
+u32 rpcs3_env_u32(const char* name, u32 def);
+
 namespace rsx
 {
 	namespace FIFO
@@ -521,6 +525,25 @@ namespace rsx
 
 		void flattening_helper::evaluate_performance(u32 total_draw_count)
 		{
+			// Thresholds can be tuned with environment variables (defaults are the original values):
+			//   RPCS3_FIFO_MIN_DRAWS     : draws per frame needed to try the FIFO flattening (default 2000)
+			//   RPCS3_FIFO_MIN_COLLAPSED : draws it has to save per frame to keep it enabled (default 500)
+			static const u32 s_min_draws = rpcs3_env_u32("RPCS3_FIFO_MIN_DRAWS", 2000);
+			static const u32 s_min_collapsed = rpcs3_env_u32("RPCS3_FIFO_MIN_COLLAPSED", 500);
+			static const bool s_bench_log = rpcs3_env_flag("RPCS3_PERF_LOG");
+			static u32 s_last_state = 0xffffffff;
+
+			if (s_bench_log)
+			{
+				const u32 state = (enabled ? 0x100u : 0u) | static_cast<u32>(fifo_hint);
+
+				if (state != s_last_state)
+				{
+					s_last_state = state;
+					rsx_log.success("BENCH fifo: flattening=%u hint=%u draws=%u collapsed=%u", enabled ? 1u : 0u, static_cast<u32>(fifo_hint), total_draw_count, num_collapsed);
+				}
+			}
+
 			if (!enabled)
 			{
 				if (fifo_hint == optimization_hint::application_not_compatible)
@@ -529,7 +552,7 @@ namespace rsx
 					return;
 				}
 
-				if (total_draw_count <= 2000)
+				if (total_draw_count <= s_min_draws)
 				{
 					// Low draw call pressure
 					fifo_hint = optimization_hint::load_low;
@@ -546,7 +569,7 @@ namespace rsx
 			if (enabled)
 			{
 				// Currently activated. Check if there is any benefit
-				if (num_collapsed < 500)
+				if (num_collapsed < s_min_collapsed)
 				{
 					// Not worth it, disable
 					enabled = false;
@@ -554,7 +577,7 @@ namespace rsx
 				}
 
 				u32 real_total = total_draw_count + num_collapsed;
-				if (real_total <= 2000)
+				if (real_total <= s_min_draws)
 				{
 					// Low total number of draws submitted, no need to keep trying for now
 					enabled = false;
@@ -566,7 +589,7 @@ namespace rsx
 			else
 			{
 				// Not enabled, check if we should try enabling
-				ensure(total_draw_count > 2000);
+				ensure(total_draw_count > s_min_draws);
 				if (fifo_hint != load_unoptimizable)
 				{
 					// If its set to unoptimizable, we already tried and it did not work
