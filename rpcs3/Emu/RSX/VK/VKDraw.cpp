@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "../Common/BufferUtils.h"
 #include "../Program/GLSLCommon.h"
+#include "../Program/ProgramStateCache.h"
 #include "../rsx_methods.h"
 
 #include "VKAsyncScheduler.h"
@@ -14,10 +15,13 @@
 #include <map>
 #include <utility>
 #include <vector>
+#include <string>
+#include <cstdlib>
 
 // Defined in Utilities/Thread.cpp
 bool rpcs3_env_flag(const char* name);
 u32 rpcs3_env_u32(const char* name, u32 def);
+std::string rpcs3_env_str(const char* name);
 
 namespace vk
 {
@@ -1362,6 +1366,99 @@ void VKGSRender::end()
 		// m_rtts.on_write(); - breaks games for obvious reasons
 		rsx::thread::end();
 		return;
+	}
+
+	// Optional per-shader statistics and draw filtering, controlled by environment variables:
+	//   RPCS3_SHADER_STATS=1          : log which shaders (vertex/fragment program hashes) the draw calls use
+	//   RPCS3_SKIP_SHADERS=h1,h2,...  : skip every draw that uses a shader whose vertex or fragment hash (hex) is listed
+	static const bool s_shader_stats = rpcs3_env_flag("RPCS3_SHADER_STATS");
+	static const std::vector<u64> s_skip_shaders = []()
+	{
+		std::vector<u64> result;
+		const std::string list = rpcs3_env_str("RPCS3_SKIP_SHADERS");
+		usz pos = 0;
+
+		while (pos < list.size())
+		{
+			usz end = list.find_first_of(", ;", pos);
+
+			if (end == std::string::npos)
+			{
+				end = list.size();
+			}
+
+			if (end > pos)
+			{
+				result.push_back(std::strtoull(list.substr(pos, end - pos).c_str(), nullptr, 16));
+			}
+
+			pos = end + 1;
+		}
+
+		return result;
+	}();
+
+	if (s_shader_stats || !s_skip_shaders.empty())
+	{
+		static const void* s_last_program = nullptr;
+		static u64 s_last_vp_hash = 0;
+		static u64 s_last_fp_hash = 0;
+
+		if (static_cast<const void*>(m_program) != s_last_program)
+		{
+			s_last_program = static_cast<const void*>(m_program);
+			s_last_vp_hash = program_hash_util::vertex_program_utils::get_vertex_program_ucode_hash(current_vertex_program);
+			s_last_fp_hash = program_hash_util::fragment_program_utils::get_fragment_program_ucode_hash(current_fragment_program);
+		}
+
+		bool skip_draw = false;
+
+		for (const u64 hash : s_skip_shaders)
+		{
+			if (hash == s_last_vp_hash || hash == s_last_fp_hash)
+			{
+				skip_draw = true;
+				break;
+			}
+		}
+
+		if (s_shader_stats)
+		{
+			static std::map<std::pair<u64, u64>, u32> s_shader_buckets;
+			static u32 s_shader_counter = 0;
+			static u32 s_shader_skipped = 0;
+
+			s_shader_buckets[std::make_pair(s_last_vp_hash, s_last_fp_hash)]++;
+			s_shader_skipped += skip_draw ? 1 : 0;
+
+			if (++s_shader_counter >= 200000)
+			{
+				std::vector<std::pair<u32, std::pair<u64, u64>>> sorted;
+
+				for (const auto& [key, count] : s_shader_buckets)
+				{
+					sorted.emplace_back(count, key);
+				}
+
+				std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+
+				for (usz i = 0; i < sorted.size() && i < 12; i++)
+				{
+					rsx_log.success("BENCH shader: vp=%llx fp=%llx draws=%u of %u (skipped in total: %u)", sorted[i].second.first, sorted[i].second.second, sorted[i].first, s_shader_counter, s_shader_skipped);
+				}
+
+				s_shader_buckets.clear();
+				s_shader_counter = 0;
+				s_shader_skipped = 0;
+			}
+		}
+
+		if (skip_draw)
+		{
+			execute_nop_draw();
+			rsx::thread::end();
+			return;
+		}
 	}
 
 	// Load program execution environment
