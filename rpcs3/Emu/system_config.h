@@ -19,11 +19,11 @@ struct cfg_root : cfg::node
 		cfg::_bool ppu_debug{ this, "PPU Debug" };
 		cfg::_bool ppu_call_history{ this, "PPU Calling History" }; // Enable PPU calling history recording
 		cfg::_bool llvm_logs{ this, "Save LLVM logs" };
-		cfg::string llvm_cpu{ this, "Use LLVM CPU" };
+		cfg::string llvm_cpu{ this, "Use LLVM CPU", "skylake" }; // [oppori] CPU fijo (i5-7400/AVX2); tambien renombra las caches JIT para no reusar caches viejas
 		cfg::_int<0, 1024> llvm_threads{ this, "Max LLVM Compile Threads", 0 };
 		cfg::_bool llvm_precompilation{ this, "LLVM Precompilation", true };
 		cfg::_enum<thread_scheduler_mode> thread_scheduler{this, "Thread Scheduler Mode", thread_scheduler_mode::os};
-		cfg::_bool set_daz_and_ftz{ this, "Set DAZ and FTZ", false };
+		cfg::_bool set_daz_and_ftz{ this, "Set DAZ and FTZ", true }; // [oppori] preset de rendimiento
 		cfg::_enum<spu_decoder_type> spu_decoder{ this, "SPU Decoder", spu_decoder_type::llvm };
 		cfg::uint<0, 100> spu_reservation_busy_waiting_percentage{ this, "SPU Reservation Busy Waiting Percentage 1", 100, true };
 		cfg::_bool spu_reservation_busy_waiting_enabled{ this, "SPU Reservation Busy Waiting Enabled", false, true };
@@ -31,11 +31,11 @@ struct cfg_root : cfg::node
 		cfg::_bool spu_getllar_spin_optimization_disabled{ this, "Disable SPU GETLLAR Spin Optimization", false, true };
 		cfg::_bool spu_debug{ this, "SPU Debug" };
 		cfg::_bool mfc_debug{ this, "MFC Debug" };
-		cfg::_int<0, 6> preferred_spu_threads{ this, "Preferred SPU Threads", 0, true }; // Number of hardware threads dedicated to heavy simultaneous spu tasks
+		cfg::_int<0, 6> preferred_spu_threads{ this, "Preferred SPU Threads", 2, true }; // Number of hardware threads dedicated to heavy simultaneous spu tasks
 		cfg::_int<0, 16> spu_delay_penalty{ this, "SPU delay penalty", 3 }; // Number of milliseconds to block a thread if a virtual 'core' isn't free
-		cfg::_bool spu_loop_detection{ this, "SPU loop detection", false }; // Try to detect wait loops and trigger thread yield
+		cfg::_bool spu_loop_detection{ this, "SPU loop detection", true }; // Try to detect wait loops and trigger thread yield
 		cfg::_int<1, 6> max_spurs_threads{ this, "Max SPURS Threads", 6, true }; // HACK. If less then 6, max number of running SPURS threads in each thread group.
-		cfg::_enum<spu_block_size_type> spu_block_size{ this, "SPU Block Size", spu_block_size_type::safe };
+		cfg::_enum<spu_block_size_type> spu_block_size{ this, "SPU Block Size", spu_block_size_type::mega }; // [oppori] Mega: JIT de SPU mas rapido
 		cfg::_bool spu_accurate_dma{ this, "Accurate SPU DMA", false };
 		cfg::_bool spu_accurate_reservations{ this, "Accurate SPU Reservations", true };
 		cfg::_bool accurate_cache_line_stores{ this, "Accurate Cache Line Stores", false };
